@@ -34,7 +34,7 @@ const SunChart = ({ data }) => {
         <strong>+1 = sun on right ☀️</strong> . <strong>-1 = sun on left ☀️</strong> . Higher curve = stronger sunlight.
       </p>
 
-      <div className="w-full h-64 mb-2">
+      <div className="w-full h-64 sm:h-72 mb-2">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
@@ -57,7 +57,7 @@ const SunChart = ({ data }) => {
               domain={[-1, 1]}
               ticks={[-1, 0, 1]}
               label={{
-                value: "Sun Side (-1 left, 1 right)",
+                value: "Sun Side ",
                 angle: -90,
                 position: "insideLeft",
                 fill: "#666",

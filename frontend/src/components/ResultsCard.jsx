@@ -1,6 +1,9 @@
 import { motion } from "framer-motion";
 import { Sun, CloudSun, Info, Moon, Compass } from "lucide-react";
 import { buildNarrative } from "../utils/TripNarrative";
+import Tooltip from "./Tooltip";
+import { Info as InfoIcon } from "lucide-react";
+
 
 const ResultCard = ({ result, origin, destination }) => {
   if (!result) return null;
@@ -53,16 +56,16 @@ const ResultCard = ({ result, origin, destination }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="bg-white dark:bg-gray-800 dark:text-gray-100 backdrop-blur-md p-6 rounded-2xl shadow-md w-full max-w-3xl mx-auto mt-6 border border-gray-200 dark:border-gray-700"
-    >
-      <h2 className="text-2xl font-semibold mb-2 flex items-center justify-center">
+      className="bg-white dark:bg-gray-800 backdrop-blur-md p-4 sm:p-6 rounded-2xl shadow-md w-full mx-auto border border-gray-200 dark:border-gray-700"
+>
+      <h2 className="text-xl sm:text-2xl font-semibold mb-2 text-center">
         <Sun className="text-yellow-500 mr-2" />
         {shade_side
           ? `Sit on the ${shade_side.charAt(0).toUpperCase() + shade_side.slice(1)} side`
           : "No Sunlight Right Now"}
       </h2>
 
-      <p className="text-center text-gray-600 dark:text-gray-300 mb-3">
+      <p className="text-center text-gray-600 dark:text-gray-300 text-sm sm:text-base mb-3">
         {sun_side
           ? `🌞 The sun will mostly be on your ${sun_side} side during this trip.`
           : "🌙 It's dark outside, so no sunlight data."}
@@ -79,12 +82,9 @@ const ResultCard = ({ result, origin, destination }) => {
         <p className="text-gray-700 dark:text-gray-300">
           <Compass className="inline-block w-4 h-4 mr-1 text-blue-500" />
           <span className="font-medium">Confidence:</span> {confPercent}%
-          <span
-            title="Confidence means how sure the app is that the sun will stay on this side for most of your route, based on sun position consistency."
-            className="ml-1 cursor-help text-gray-400"
-          >
-            <Info className="inline w-3 h-3" />
-          </span>
+          <Tooltip text="Confidence shows how sure we are that the sun will stay on this side for most of your trip. A higher value means the sun’s direction stayed consistent along the route.">
+  <Info className="inline w-3 h-3 ml-1 text-gray-400 cursor-pointer" />
+</Tooltip>
         </p>
         <p className="text-gray-500 dark:text-gray-400 text-sm">
           Sunrise:{" "}

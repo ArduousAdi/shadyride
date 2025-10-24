@@ -107,9 +107,9 @@ const App = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500">
       {/* ===== Header with Title + Dark Mode Toggle ===== */}
-      <header className="flex items-center justify-between max-w-4xl mx-auto p-4">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Sun className="text-yellow-500" /> Shade Decider
+      <header className="flex flex-wrap items-center justify-between max-w-4xl mx-auto p-4 gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+          <Sun className="text-yellow-500 w-6 h-6 sm:w-8 sm:h-8" /> Shade Decider
         </h1>
         <ThemeToggle /> {/* ✅ Dark mode toggle button */}
       </header>
@@ -203,6 +203,7 @@ const App = () => {
           </div>
         )}
 
+        {/* ===== Results Section ===== */}
         <AnimatePresence>
           {result && (
             <motion.div
@@ -210,6 +211,7 @@ const App = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               key="results"
+              className="flex flex-col gap-6"
             >
               <ResultsCard result={result} />
               <MapView coordinates={result.coordinates} />
