@@ -6,6 +6,7 @@ import MapView from './components/MapView';
 import ResultsCard from './components/ResultsCard';
 import SunChart from './components/SunChart';
 import AutoCompleteInput from './components/AutoCompleteInput';
+import ThemeToggle from "./components/ThemeToggle"; // ✅ import toggle
 
 /**
  * Main application component handling user input, calling the API and rendering results.
@@ -32,9 +33,13 @@ const App = () => {
    * Returns null on failure.
    */
   const geocode = async (query) => {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+      query
+    )}&limit=1`;
     try {
-      const resp = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'shade-app-demo' } });
+      const resp = await fetch(url, {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'shade-app-demo' },
+      });
       if (!resp.ok) throw new Error('Geocoding failed');
       const data = await resp.json();
       if (data.length === 0) return null;
@@ -59,12 +64,18 @@ const App = () => {
       let origin;
       let destination;
       if (selectedOrigin && selectedOrigin.lat && selectedOrigin.lon) {
-        origin = { lat: parseFloat(selectedOrigin.lat), lon: parseFloat(selectedOrigin.lon) };
+        origin = {
+          lat: parseFloat(selectedOrigin.lat),
+          lon: parseFloat(selectedOrigin.lon),
+        };
       } else {
         origin = await geocode(originQuery);
       }
       if (selectedDest && selectedDest.lat && selectedDest.lon) {
-        destination = { lat: parseFloat(selectedDest.lat), lon: parseFloat(selectedDest.lon) };
+        destination = {
+          lat: parseFloat(selectedDest.lat),
+          lon: parseFloat(selectedDest.lon),
+        };
       } else {
         destination = await geocode(destQuery);
       }
@@ -94,92 +105,119 @@ const App = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <h1 className="text-3xl font-bold flex items-center gap-2 mb-6">
-        <Sun className="text-yellow-500" /> Shade Decider
-      </h1>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 items-end">
-        <AutoCompleteInput
-          label="Origin"
-          placeholder="Enter starting address"
-          onQueryChange={(val) => setOriginQuery(val)}
-          onSelect={(item) => {
-            if (item) {
-              setSelectedOrigin(item);
-              setOriginQuery(item.display_name);
-            } else {
-              setSelectedOrigin(null);
-            }
-          }}
-        />
-        <AutoCompleteInput
-          label="Destination"
-          placeholder="Enter destination address"
-          onQueryChange={(val) => setDestQuery(val)}
-          onSelect={(item) => {
-            if (item) {
-              setSelectedDest(item);
-              setDestQuery(item.display_name);
-            } else {
-              setSelectedDest(null);
-            }
-          }}
-        />
-        <div className="flex flex-col">
-          <label htmlFor="date" className="text-sm font-medium text-gray-700 mb-1">Date</label>
-          <input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-            required
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-500">
+      {/* ===== Header with Title + Dark Mode Toggle ===== */}
+      <header className="flex items-center justify-between max-w-4xl mx-auto p-4">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <Sun className="text-yellow-500" /> Shade Decider
+        </h1>
+        <ThemeToggle /> {/* ✅ Dark mode toggle button */}
+      </header>
+
+      {/* ===== Main Content ===== */}
+      <main className="max-w-4xl mx-auto p-4">
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 items-end"
+        >
+          <AutoCompleteInput
+            label="Origin"
+            placeholder="Enter starting address"
+            onQueryChange={(val) => setOriginQuery(val)}
+            onSelect={(item) => {
+              if (item) {
+                setSelectedOrigin(item);
+                setOriginQuery(item.display_name);
+              } else {
+                setSelectedOrigin(null);
+              }
+            }}
           />
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor="time" className="text-sm font-medium text-gray-700 mb-1">Time</label>
-          <input
-            id="time"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-            required
+          <AutoCompleteInput
+            label="Destination"
+            placeholder="Enter destination address"
+            onQueryChange={(val) => setDestQuery(val)}
+            onSelect={(item) => {
+              if (item) {
+                setSelectedDest(item);
+                setDestQuery(item.display_name);
+              } else {
+                setSelectedDest(null);
+              }
+            }}
           />
-        </div>
-        <div className="col-span-1 sm:col-span-2 lg:col-span-4 flex justify-end">
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            disabled={loading}
-          >
-            {loading ? (
-              <span className="inline-flex items-center">
-                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Calculating...
-              </span>
-            ) : (
-              <span className="inline-flex items-center">
-                <MapPin className="mr-2 h-4 w-4" /> Calculate
-              </span>
-            )}
-          </button>
-        </div>
-      </form>
-      {error && <div className="mb-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>}
-      <AnimatePresence>
-        {result && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            key="results"
-          >
-            <ResultsCard result={result} />
-            <MapView coordinates={result.coordinates} />
-            <SunChart data={result.chartData} />
-          </motion.div>
+          <div className="flex flex-col">
+            <label
+              htmlFor="date"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              Date
+            </label>
+            <input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="p-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800"
+              required
+            />
+          </div>
+          <div className="flex flex-col">
+            <label
+              htmlFor="time"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              Time
+            </label>
+            <input
+              id="time"
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="p-2 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800"
+              required
+            />
+          </div>
+          <div className="col-span-1 sm:col-span-2 lg:col-span-4 flex justify-end">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="inline-flex items-center">
+                  <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> Calculating...
+                </span>
+              ) : (
+                <span className="inline-flex items-center">
+                  <MapPin className="mr-2 h-4 w-4" /> Calculate
+                </span>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded">
+            {error}
+          </div>
         )}
-      </AnimatePresence>
+
+        <AnimatePresence>
+          {result && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              key="results"
+            >
+              <ResultsCard result={result} />
+              <MapView coordinates={result.coordinates} />
+              <SunChart data={result.chartData} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 };
