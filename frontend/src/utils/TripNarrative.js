@@ -23,10 +23,10 @@ export function buildNarrative({
   const headingText = directions[headingIndex];
 
   let confidenceText = "";
-  if (confidence >= 0.9) confidenceText = "absolutely certain ☀️";
-  else if (confidence >= 0.75) confidenceText = "pretty sure 🌤️";
-  else if (confidence >= 0.5) confidenceText = "fairly confident ⛅";
-  else confidenceText = "not entirely sure; the sun keeps changing ⛅";
+  if (confidence >= 0.9) confidenceText = "absolutely certain ";
+  else if (confidence >= 0.75) confidenceText = "pretty sure ";
+  else if (confidence >= 0.5) confidenceText = "fairly confident ";
+  else confidenceText = "not entirely sure; the sun keeps changing ";
 
   let weatherText = "";
   const desc = weather?.description?.toLowerCase() || "";
@@ -41,6 +41,6 @@ export function buildNarrative({
   return `
 Leaving ${origin || "your starting point"}, you’ll be heading mostly ${headingText} toward ${destination || "your destination"}.
 It looks like a ${weatherText} kind of day, so expect ${sun_side === "right" ? "bright light on your right" : "warm rays on your left"} for most of the trip.
-I am ${confidenceText}  ${shade_side === "left" ? "left seats" : "right seats"} will feel cooler and shadier along the way 😎
+I am ${confidenceText}  ${shade_side === "left" ? "left seats" : "right seats"} will feel cooler and shadier along the way 
   `.trim();
 }

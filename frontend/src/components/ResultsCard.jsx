@@ -1,112 +1,161 @@
+import React from "react";
+import { Sun, Info, Clock } from "lucide-react";
 import { motion } from "framer-motion";
-import { Sun, CloudSun, Info, Moon, Compass } from "lucide-react";
 import { buildNarrative } from "../utils/TripNarrative";
-import Tooltip from "./Tooltip";
-import { Info as InfoIcon } from "lucide-react";
 
+/**
+ * Tooltip component (minimal, Tailwind-only)
+ */
+const Tooltip = ({ text, children }) => (
+  <div className="relative group cursor-pointer inline-flex items-center">
+    {children}
+    <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10 shadow-lg">
+      {text}
+    </div>
+  </div>
+);
 
-const ResultCard = ({ result, origin, destination }) => {
+/**
+ * Displays computed results for the shade side, confidence, weather and trip summary.
+ */
+const ResultsCard = ({ result }) => {
   if (!result) return null;
 
   const {
     shade_side,
     sun_side,
+    confidence,
     sunrise,
     sunset,
-    confidence,
     weather,
     reason,
+    isPastTrip,
+    tripNote,
+    estimatedDuration,
+    message,
   } = result;
 
-  // parse angles for readable direction
-  const headingMatch = reason?.match(/heading\s([\d.]+)/);
-  const azimuthMatch = reason?.match(/azimuth\s([\d.]+)/);
-  const avgHeading = headingMatch ? parseFloat(headingMatch[1]) : 0;
-  const avgAzimuth = azimuthMatch ? parseFloat(azimuthMatch[1]) : 0;
-
   const narrative = buildNarrative({
-    origin,
-    destination,
+    origin: result.origin,
+    destination: result.destination,
     confidence,
     weather,
-    avgHeading,
-    avgAzimuth,
+    avgHeading: result.avgHeading,
+    avgAzimuth: result.avgAzimuth,
     shade_side,
     sun_side,
   });
 
-  const confPercent = Math.round(confidence * 100);
-
-  // convert numeric heading → direction label
-  const directions = [
-    "north",
-    "north-east",
-    "east",
-    "south-east",
-    "south",
-    "south-west",
-    "west",
-    "north-west",
-  ];
-  const headingDir = directions[Math.round(((avgHeading % 360) / 45)) % 8];
-  const azimuthDir = directions[Math.round(((avgAzimuth % 360) / 45)) % 8];
+  const sunriseTime = sunrise
+    ? new Date(sunrise).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+  const sunsetTime = sunset
+    ? new Date(sunset).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="bg-white dark:bg-gray-800 backdrop-blur-md p-4 sm:p-6 rounded-2xl shadow-md w-full mx-auto border border-gray-200 dark:border-gray-700"
->
-      <h2 className="text-xl sm:text-2xl font-semibold mb-2 text-center">
-        <Sun className="text-yellow-500 mr-2" />
-        {shade_side
-          ? `Sit on the ${shade_side.charAt(0).toUpperCase() + shade_side.slice(1)} side`
-          : "No Sunlight Right Now"}
-      </h2>
+      transition={{ duration: 0.6, ease: "easeOut" }}
+      className="bg-white dark:bg-gray-900 rounded-2xl shadow-md p-6 mb-6 max-w-3xl mx-auto border border-gray-100 dark:border-gray-700 transition-colors duration-500"
+    >
+      <div className="text-center space-y-3">
+        {/* Header */}
+        <h2 className="text-2xl font-semibold flex justify-center items-center gap-2 text-gray-900 dark:text-gray-100">
+          <Sun className="text-yellow-400" />
+          {shade_side
+            ? `Sit on the ${shade_side.charAt(0).toUpperCase() + shade_side.slice(1)} side`
+            : "No sunlight during this trip"}
+        </h2>
 
-      <p className="text-center text-gray-600 dark:text-gray-300 text-sm sm:text-base mb-3">
-        {sun_side
-          ? `🌞 The sun will mostly be on your ${sun_side} side during this trip.`
-          : "🌙 It's dark outside, so no sunlight data."}
-      </p>
-
-      <div className="mt-2 text-center space-y-2 text-sm">
-        {weather && (
-          <p className="text-gray-700 dark:text-gray-300">
-            <CloudSun className="inline-block w-4 h-4 mr-1 text-yellow-500" />
-            <span className="font-medium">Weather:</span>{" "}
-            {weather.description} ({weather.cloudCover ?? 0}% clouds)
+        {/* Subheading */}
+        {shade_side && (
+          <p className="text-gray-600 dark:text-gray-300 text-base">
+            The sun will mostly be on your{" "}
+            <strong className="text-gray-800 dark:text-gray-100">{sun_side}</strong> side.
           </p>
         )}
-        <p className="text-gray-700 dark:text-gray-300">
-          <Compass className="inline-block w-4 h-4 mr-1 text-blue-500" />
-          <span className="font-medium">Confidence:</span> {confPercent}%
-          <Tooltip text="Confidence shows how sure we are that the sun will stay on this side for most of your trip. A higher value means the sun’s direction stayed consistent along the route.">
-  <Info className="inline w-3 h-3 ml-1 text-gray-400 cursor-pointer" />
-</Tooltip>
-        </p>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">
-          Sunrise:{" "}
-          {new Date(sunrise).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • Sunset:{" "}
-          {new Date(sunset).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </p>
-      </div>
 
-      <div className="mt-5 bg-yellow-50 dark:bg-gray-700/40 rounded-xl p-4 text-gray-800 dark:text-gray-200 leading-relaxed text-[15px] italic">
-        {narrative}
-      </div>
+        {/* Weather + Confidence */}
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-3 text-sm text-gray-600 dark:text-gray-400 mt-2">
+          {weather && (
+            <div className="flex items-center gap-1">
+              <Sun className="w-4 h-4 text-yellow-400" />
+              {weather.description} ({weather.cloudCover}% clouds)
+            </div>
+          )}
+          <Tooltip text="Depends on how frequently the sun shifts during the journey">
+            <div className="flex items-center gap-1">
+              <Info className="w-4 h-4 text-blue-400" />
+              Confidence: {(confidence * 100).toFixed(0)}%
+            </div>
+          </Tooltip>
+        </div>
 
-      <div className="text-xs text-center text-gray-500 dark:text-gray-400 mt-3">
-        On average, you’ll be heading <strong>{headingDir}</strong>, and the sun will stay{" "}
-        <strong>{azimuthDir}</strong> of you during the trip.
-      </div>
+        {/* Sunrise & Sunset */}
+        {sunriseTime && sunsetTime && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Sunrise: {sunriseTime} · Sunset: {sunsetTime}
+          </p>
+        )}
 
-      <p className="text-center text-gray-400 text-xs mt-3 italic">
-        This app estimates sunlight direction using live weather, solar position, and your exact road path.
-      </p>
+        {/* Narrative Block */}
+        {narrative && (
+          <div className="bg-yellow-50 dark:bg-gray-700/40 text-gray-800 dark:text-gray-100 italic rounded-md p-4 my-4 leading-relaxed shadow-sm max-w-2xl mx-auto text-balance">
+            {narrative}
+          </div>
+        )}
+
+        {/* Average Reason */}
+        {reason && (
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {reason.replace(/heading\s\d+(\.\d+)?°/, (m) => {
+              const val = parseFloat(m.match(/\d+(\.\d+)?/)[0]) % 360;
+              return `heading ${val.toFixed(1)}°`;
+            })}
+          </p>
+        )}
+
+        {/* Night Message */}
+        {message && (
+          <p className="text-sm italic text-gray-500 dark:text-gray-400">{message}</p>
+        )}
+
+        {/* Duration */}
+        {estimatedDuration && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="flex justify-center items-center gap-2 text-sm text-gray-700 dark:text-gray-300 font-medium mt-3"
+          >
+            <Clock className="w-4 h-4 text-blue-500" />
+            Estimated travel time: <span className="font-semibold">{estimatedDuration}</span>
+          </motion.div>
+        )}
+
+        {/* Past Trip Note */}
+        {isPastTrip && tripNote && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="text-center text-sm italic text-gray-500 dark:text-gray-400 mt-2"
+          >
+            {tripNote}
+          </motion.p>
+        )}
+
+        {/* Footer */}
+        <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 leading-snug max-w-md mx-auto">
+          <Info className="inline w-3 h-3 mr-1 text-blue-400" />
+          This app estimates sunlight direction using live weather, solar position, and
+          route geometry, assuming an average travel speed of 60 km/h.
+        </div>
+      </div>
     </motion.div>
   );
 };
 
-export default ResultCard;
+export default ResultsCard;

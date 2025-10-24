@@ -109,7 +109,7 @@ const App = () => {
       {/* ===== Header with Title + Dark Mode Toggle ===== */}
       <header className="flex flex-wrap items-center justify-between max-w-4xl mx-auto p-4 gap-2">
         <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-          <Sun className="text-yellow-500 w-6 h-6 sm:w-8 sm:h-8" /> Shade Decider
+          <Sun className="text-yellow-500 w-6 h-6 sm:w-8 sm:h-8" /> ShadyRide
         </h1>
         <ThemeToggle /> {/* ✅ Dark mode toggle button */}
       </header>
@@ -220,6 +220,16 @@ const App = () => {
           )}
         </AnimatePresence>
       </main>
+      <footer className="border-t border-gray-200 dark:border-gray-700 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+  Crafted with ☀️ by <span className="font-medium text-gray-700 dark:text-gray-200">Aditya Kumar Jha</span>
+  <div className="flex justify-center gap-4 mt-2">
+    <a href="https://github.com/ArduousAdi" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">GitHub</a>
+    <a href="https://linkedin.com/in/adityaah" target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">LinkedIn</a>
+    <a href="mailto:jhaaditya715@gmail.com" className="hover:text-blue-500">Email</a>
+  </div>
+  <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">© 2025 ShadyRide · All rights reserved</p>
+</footer>
+
     </div>
   );
 };

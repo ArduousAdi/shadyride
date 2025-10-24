@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-console.log("DEBUG ORS key loaded:", !!process.env.ORS_API_KEY);
-
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -14,14 +12,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* -------------------------------------------------------------------------- */
-/*                               Helper functions                             */
-/* -------------------------------------------------------------------------- */
-
-// Bearing between two geographic points
+// Utility: convert bearings between points
 function calculateBearing(a, b) {
-  const toRad = (deg) => (deg * Math.PI) / 180;
-  const toDeg = (rad) => (rad * 180) / Math.PI;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const toDeg = (r) => (r * 180) / Math.PI;
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
   const dLon = toRad(b.lon - a.lon);
@@ -29,93 +23,71 @@ function calculateBearing(a, b) {
   const x =
     Math.cos(lat1) * Math.sin(lat2) -
     Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-  let brng = Math.atan2(y, x);
-  brng = (toDeg(brng) + 360) % 360;
-  return brng;
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-// Fetch real route geometry from ORS Directions API
+// Get real route + distance via ORS
 async function getRoutePoints(origin, destination) {
   try {
     const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${origin.lon},${origin.lat}&end=${destination.lon},${destination.lat}&geometry_format=geojson`;
-
     const resp = await fetch(url);
     const data = await resp.json();
 
-    if (!resp.ok || !data?.features?.[0]?.geometry?.coordinates) {
-      console.error("❌ ORS error:", data);
-      throw new Error("ORS request failed");
+    if (!resp.ok || !data?.features) {
+      console.error("ORS error:", data);
+      return {
+        coords: [
+          { lat: origin.lat, lon: origin.lon },
+          { lat: destination.lat, lon: destination.lon },
+        ],
+        distance: 0,
+      };
     }
 
     const coords = data.features[0].geometry.coordinates.map(([lon, lat]) => ({
       lat,
       lon,
     }));
-
-    console.log(`✅ ORS returned ${coords.length} coordinates`);
-    return coords;
+    const distance = data.features[0].properties.summary.distance; // meters
+    return { coords, distance };
   } catch (err) {
-    console.error("⚠️ Failed to fetch ORS route:", err.message);
-    // fallback: straight line
-    return [
-      { lat: origin.lat, lon: origin.lon },
-      { lat: destination.lat, lon: destination.lon },
-    ];
+    console.error("Failed to fetch ORS route:", err);
+    return {
+      coords: [
+        { lat: origin.lat, lon: origin.lon },
+        { lat: destination.lat, lon: destination.lon },
+      ],
+      distance: 0,
+    };
   }
 }
 
-// Resample short routes for smoother charts
-function resampleRoute(coordinates) {
-  if (coordinates.length > 2 && coordinates.length < 20) {
-    const resampled = [];
-    for (let i = 0; i < coordinates.length - 1; i++) {
-      const a = coordinates[i];
-      const b = coordinates[i + 1];
-      for (let j = 0; j < 10; j++) {
-        const t = j / 10;
-        resampled.push({
-          lat: a.lat + (b.lat - a.lat) * t,
-          lon: a.lon + (b.lon - a.lon) * t,
-        });
-      }
-    }
-    return resampled;
-  }
-  return coordinates;
-}
-
-// Determine which side of the bus/car the sun is on
-function getSunSide(sunAzimuth, heading) {
-  const diff = (sunAzimuth - heading + 360) % 360;
-  return diff <= 180 ? "right" : "left";
-}
-
-// Fetch current weather data from OpenWeatherMap
+// Get weather info
 async function getWeather(lat, lon) {
   if (!WEATHER_API_KEY) return null;
   const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}`;
   try {
-    const resp = await fetch(url);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    const cloudCover = data.clouds?.all;
-    const description = data.weather?.[0]?.description || "";
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
     return {
-      cloudCover: typeof cloudCover === "number" ? cloudCover : null,
-      description,
+      cloudCover: data.clouds?.all ?? null,
+      description: data.weather?.[0]?.description || "",
     };
   } catch {
     return null;
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                API Endpoint                                */
-/* -------------------------------------------------------------------------- */
+// Determine sun side
+function getSunSide(sunAz, heading) {
+  const diff = (sunAz - heading + 360) % 360;
+  return diff <= 180 ? "right" : "left";
+}
 
+// Main API route
 app.post("/api/shade", async (req, res) => {
   const { origin, destination, datetime } = req.body || {};
-
   if (
     !origin ||
     !destination ||
@@ -126,56 +98,48 @@ app.post("/api/shade", async (req, res) => {
   ) {
     return res
       .status(400)
-      .json({ error: "origin and destination with lat/lon required" });
+      .json({ error: "origin and destination with lat/lon are required" });
   }
 
-  // Parse departure time
-  let depTime = new Date();
-  if (datetime) {
-    const parsed = new Date(datetime);
-    if (!isNaN(parsed)) depTime = parsed;
+  let depTime;
+  try {
+    depTime = datetime ? new Date(datetime) : new Date();
+    if (isNaN(depTime)) throw new Error("Invalid date");
+  } catch {
+    return res.status(400).json({ error: "Invalid datetime provided" });
   }
+
+  const now = new Date();
+  const isPastTrip = depTime < now;
 
   try {
-    // 1️⃣ Fetch ORS route
-    let coordinates = await getRoutePoints(origin, destination);
-    coordinates = resampleRoute(coordinates);
-    console.log("Debug → coordinates length:", coordinates.length);
-
-    // If only two points, still fallback
-    if (coordinates.length <= 2) {
-      console.warn("⚠️ Using fallback straight route (ORS failed).");
+    const { coords, distance } = await getRoutePoints(origin, destination);
+    const segments = [];
+    for (let i = 0; i < coords.length - 1; i++) {
+      segments.push({ start: coords[i], end: coords[i + 1] });
     }
 
-    // 2️⃣ Compute daylight info
-    const times = SunCalc.getTimes(depTime, origin.lat, origin.lon);
-    const sunrise = times.sunrise;
-    const sunset = times.sunset;
-    if (!sunrise || !sunset || depTime < sunrise || depTime > sunset) {
-      return res.json({
-        shade_side: null,
-        sun_side: null,
-        message: "No sunlight at the specified time",
-        sunrise,
-        sunset,
-        coordinates,
-        chartData: [],
-      });
-    }
-
-    // 3️⃣ Weather / cloud cover
     const weather = await getWeather(origin.lat, origin.lon);
     const cloudCover = weather?.cloudCover ?? null;
     const weatherDesc = weather?.description ?? "";
 
-    // 4️⃣ Segment computations
-    const segments = [];
-    for (let i = 0; i < coordinates.length - 1; i++) {
-      segments.push({ start: coordinates[i], end: coordinates[i + 1] });
-    }
+    // Get sunrise/sunset at origin
+    const times = SunCalc.getTimes(depTime, origin.lat, origin.lon);
+    const sunrise = times.sunrise;
+    const sunset = times.sunset;
+
+    // Estimate total duration (based on 80 km/h avg)
+    const avgSpeed = 80 * 1000 / 3600;
+    const totalDurationMs = distance ? (distance / avgSpeed) * 1000 : 0;
+    const durationHrs = totalDurationMs / (1000 * 60 * 60);
+    const durationStr =
+      durationHrs >= 1
+        ? `${Math.floor(durationHrs)}h ${Math.round((durationHrs % 1) * 60)}m`
+        : `${Math.round(durationHrs * 60)}m`;
 
     const chartData = [];
     let leftCount = 0;
+    let sunSegments = 0;
     let sumAz = 0;
     let sumHeading = 0;
 
@@ -184,76 +148,101 @@ app.post("/api/shade", async (req, res) => {
       const heading = calculateBearing(seg.start, seg.end);
       sumHeading += heading;
 
+      // simulate realistic time across journey
       const segTime = new Date(
-        depTime.getTime() + (i / Math.max(segments.length - 1, 1)) * 3600 * 1000
+        depTime.getTime() + (i / segments.length) * totalDurationMs
       );
-      const sunPos = SunCalc.getPosition(segTime, seg.start.lat, seg.start.lon);
-      const sunAzimuth = (sunPos.azimuth * 180) / Math.PI + 180;
-      const altitude = sunPos.altitude;
+      const sunPos = SunCalc.getPosition(
+        segTime,
+        seg.start.lat,
+        seg.start.lon
+      );
+      const sunAz = ((sunPos.azimuth * 180) / Math.PI + 180) % 360;
+      const sunAlt = sunPos.altitude; // radians
 
-      let intensity = Math.max(0, Math.sin(altitude));
+      // skip dark segments
+      if (segTime < sunrise || segTime > sunset || sunAlt <= 0) {
+        chartData.push({
+          index: i,
+          heading,
+          sunAzimuth: sunAz,
+          sunSide: "none",
+          intensity: 0,
+          timestamp: segTime.toISOString(),
+        });
+        continue;
+      }
+
+      const sunSide = getSunSide(sunAz, heading);
+      if (sunSide === "left") leftCount++;
+      sunSegments++;
+
+      let intensity = Math.sin(sunAlt);
       if (cloudCover != null) intensity *= 1 - cloudCover / 100;
 
-      const sunSide = getSunSide(sunAzimuth % 360, heading);
-      if (sunSide === "left") leftCount++;
-
-      sumAz += sunAzimuth;
-
+      sumAz += sunAz;
       chartData.push({
         index: i,
         heading,
-        sunAzimuth,
+        sunAzimuth: sunAz,
         sunSide,
         intensity,
         timestamp: segTime.toISOString(),
       });
     }
 
-    const majoritySunSide = leftCount > segments.length / 2 ? "left" : "right";
-    const shadeSide = majoritySunSide === "left" ? "right" : "left";
-    const confidence =
-      segments.length > 0
-        ? Math.abs(leftCount / segments.length - 0.5) * 2
-        : 0;
-
-    const avgHeading = segments.length ? sumHeading / segments.length : null;
-    const avgAz = segments.length ? sumAz / segments.length : null;
-    let reason = "";
-    if (avgHeading != null && avgAz != null) {
-      reason = `Average route heading ${avgHeading.toFixed(
-        1
-      )}° and average sun azimuth ${avgAz.toFixed(
-        1
-      )}°. The sun spends ${
-        majoritySunSide === "left" ? leftCount : segments.length - leftCount
-      } of ${segments.length} segments on your ${majoritySunSide} side.`;
+    // if all segments dark, short-circuit
+    if (sunSegments === 0) {
+      return res.json({
+        shade_side: null,
+        sun_side: null,
+        message: "No sunlight during this trip — it's entirely night time 🌙",
+        sunrise,
+        sunset,
+        estimatedDuration: durationStr,
+        isPastTrip,
+        tripNote: isPastTrip
+          ? "Looks like you're reminiscing the past — we hope you picked the coziest seat that night 🌌"
+          : "",
+        chartData,
+        coordinates: coords,
+      });
     }
 
-    // 5️⃣ Response
-    res.json({
+    const majoritySunSide = leftCount > sunSegments / 2 ? "left" : "right";
+    const shadeSide = majoritySunSide === "left" ? "right" : "left";
+    const confidence =
+      Math.abs(leftCount / sunSegments - 0.5) * 2 || 0;
+    const avgHeading = sumHeading / sunSegments || 0;
+    const avgAz = sumAz / sunSegments || 0;
+
+    let reason = `Average heading ${avgHeading.toFixed(
+      1
+    )}° vs sun azimuth ${avgAz.toFixed(1)}°. The sun shines on your ${majoritySunSide} for ${leftCount} of ${sunSegments} sunlit segments.`;
+
+    const tripNote = isPastTrip
+      ? "Looks like you're reminiscing the past, hope you picked the shadier side back then ☀️. Regards, Aditya."
+      : "";
+
+    return res.json({
       shade_side: shadeSide,
       sun_side: majoritySunSide,
+      confidence,
       sunrise,
       sunset,
-      coordinates,
+      coordinates: coords,
       chartData,
-      confidence,
       reason,
-      weather: weatherDesc
-        ? { cloudCover, description: weatherDesc }
-        : null,
+      weather: weatherDesc ? { cloudCover, description: weatherDesc } : null,
+      estimatedDuration: durationStr,
+      isPastTrip,
+      tripNote,
     });
-  } catch (err) {
-    console.error("Internal Server Error:", err);
-    res.status(500).json({ error: "Internal server error" });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-/* -------------------------------------------------------------------------- */
-/*                                 Start server                               */
-/* -------------------------------------------------------------------------- */
-
 const port = PORT || 4000;
-app.listen(port, () => {
-  console.log(`Shade API listening on port ${port}`);
-});
+app.listen(port, () => console.log(`Shade API running on port ${port}`));
