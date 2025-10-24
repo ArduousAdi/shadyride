@@ -86,11 +86,12 @@ const App = () => {
       }
       // Construct ISO datetime string
       const isoDateTime = new Date(`${date}T${time}:00`).toISOString();
-      const response = await axios.post('/api/shade', {
-        origin,
-        destination,
-        datetime: isoDateTime,
-      });
+      const backendURL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+const response = await axios.post(`${backendURL}/api/shade`, {
+  origin,
+  destination,
+  datetime: isoDateTime,
+});
       setResult(response.data);
     } catch (err) {
       console.error(err);
