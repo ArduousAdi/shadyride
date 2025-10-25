@@ -7,7 +7,7 @@ import ResultsCard from './components/ResultsCard';
 import SunChart from './components/SunChart';
 import AutoCompleteInput from './components/AutoCompleteInput';
 import ThemeToggle from "./components/ThemeToggle"; // ✅ import toggle
-import { SpeedInsights } from "@vercel/speed-insights/next"
+
 
 /**
  * Main application component handling user input, calling the API and rendering results.
@@ -221,7 +221,6 @@ const response = await axios.post(`${backendURL}/api/shade`, {
             </motion.div>
           )}
         </AnimatePresence>
-        <SpeedInsights />
       </main>
       <footer className="border-t border-gray-200 dark:border-gray-700 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
   Crafted with ☀️ by <span className="font-medium text-gray-700 dark:text-gray-200">Aditya Kumar Jha</span>
